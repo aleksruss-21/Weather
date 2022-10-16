@@ -1,0 +1,79 @@
+stages:
+  - validate
+#  - test
+  - build
+  - deploy
+
+variables:
+  DOCKER_IMAGE: "aleksandr/stage2"
+
+black:
+  stage: validate
+  image: python:3.10-alpine
+  before_script:
+    - pip install black
+  script:
+    - black --check .
+
+mypy:
+  stage: validate
+  image: python:3.10-alpine
+  before_script:
+    - pip install mypy
+    - pip install types-requests
+    - pip install types-redis
+  script:
+    - mypy .
+
+flake8:
+  stage: validate
+  image: python:3.10-alpine
+  before_script:
+    - pip install flake8
+  script:
+    - flake8 .
+
+#pytest:
+#  stage: test
+#  image: python:3.10.1
+#  before_script:
+#    - pip install pytest sanic sanic_testing
+#  script:
+#    - pytest .
+
+build:
+  stage: build
+  image: docker
+  services:
+    - docker:dind
+  script:
+    - docker build --tag foobar .
+    # Save built image to .tar file so it could be used on deploy step without rebuilding
+    - mkdir images && docker save foobar > images/foobar.tar
+  artifacts:
+    paths:
+      - images
+
+# This step will deploy your docker-compose.yml. You may either keep it separate or integrate
+# to the custom CI/CD flow of your project, the only essential part here is script
+deploy:
+  stage: deploy
+  # We need to use docker image and docker:dind service for this pipeline step
+  image: docker
+  services:
+    - docker:dind
+  script:
+    # Run ssh-agent and add private key to SSH agent, so docker-compose could later use it for authentication
+    - eval `ssh-agent` && echo "$DEPLOY_SSH_KEY" | ssh-add -
+    # Add target server public SSH key fingerprint to known_hosts
+    - mkdir -p ~/.ssh && ssh-keyscan -H $DEPLOY_HOST >> ~/.ssh/known_hosts
+    # Set up target for docker-compose
+    - export DOCKER_HOST=ssh://$DEPLOY_USER@$DEPLOY_HOST
+    # The following is only required if you save docker image as artifact on the previous step
+    - docker load -i images/foobar.tar
+    # Deploy docker-compose.yml to target host. You may want to customize the following parameters:
+    # 1. In case docker-compose.yml is not in the root directory of your repo you have to set
+    #    relative path to it using --project-directory argument
+    # 2. You may want to use something other than "project" for --project-name
+    - docker-compose --project-directory . --project-name stage2 up --detach --force-recreate --remove-orphans --renew-anon-volumes
+  when: manual
