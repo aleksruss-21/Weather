@@ -4,7 +4,6 @@ from app.service.get_data.process_data import ProcessStationData, ProcessStation
 from app.service.get_data.collect import CollectWeatherData, CollectData
 import asyncio
 import os
-from aiohttp import ClientSession, ClientTimeout  # type: ignore
 
 
 async def upload_icao():
