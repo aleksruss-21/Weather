@@ -55,4 +55,3 @@ class CollectWeatherData(object):
         except ClientOSError:
             await self.get_station_data(icao)
         await asyncio.sleep(20)
-

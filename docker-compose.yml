@@ -1,0 +1,53 @@
+version: "3.3"
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+
+  redis:
+    image: redis
+    restart: always
+    environment:
+      - REDIS_HOST=redis
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 128mb
+
+
+  redis-commander:
+    image: rediscommander/redis-commander
+    restart: always
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=redis
+    depends_on:
+      - redis
+
+  mongo:
+    image: mongo
+    environment:
+      - MONGO_HOST=mongo
+    ports:
+      - "27017:27017"
+    restart: always
+    volumes:
+      - ./mongodb:/var/lib/mongodb/data
+
+volumes:
+  mongo:
+    driver: local
+
+#  worker_celery:
+#    build: .
+#    entrypoint:
+#      - celery -A task_manager worker --loglevel=info
+#    restart: always
+#
+#  worker_celery_beat:
+#    build: .
+#    entrypoint:
+#      - celery -A task_manager beat -l info
+#    restart: always
+

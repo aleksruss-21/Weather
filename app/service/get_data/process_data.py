@@ -1,10 +1,10 @@
 import time
 import re
 import os
-import aiohttp  # type: ignore
 from datetime import timedelta, datetime as dt
 from app.storage.mongo_client import DB
 from typing import Dict, Union
+import requests
 
 
 class ProcessStationData(object):
@@ -79,19 +79,15 @@ class ProcessStationsText(object):
 async def get_stations_to_parse() -> list[str]:
     """Get stations array with new reports in last 30 minutes"""
     url = "https://tgftp.nws.noaa.gov/data/observations/metar/decoded/?C=M;O=D"
-    async with aiohttp.request("GET", url) as response:
-        text = await response.text()
-        with open("list.txt", "w") as file:
-            file.write(text)
-
-        with open("list.txt", "r") as file:
-            arr = []
-            for line in file:
-                if re.match('^<tr><td><a href=".....TXT*', line):
-                    icao = line[17:21]
-                    date_report = line[62:79]
-                    datetime_format = dt.strptime(date_report, "%d-%b-%Y %H:%M")
-                    if dt.utcnow() - datetime_format < timedelta(minutes=30):
-                        arr.append(icao)
-    os.remove("list.txt")
-    return arr
+    response = requests.get(url)
+    response_split = response.text.split("\n")
+    icao = []
+    for item in response_split[9:-4]:
+        date_report = item[62:79]
+        datetime_format = dt.strptime(date_report, "%d-%b-%Y %H:%M")
+        if dt.utcnow() - datetime_format <= timedelta(minutes=30):
+            icao_name = item[27:31]
+            icao.append(icao_name)
+        else:
+            break
+    return icao
